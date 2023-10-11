@@ -15,7 +15,7 @@ designed to make your development process more efficient and your code cleaner.
 To get started with [commons](https://github.com/deepakdaneva/commons), you can add it as a dependency in your Maven
 project by adding the following to your `pom.xml`:
 
-### To Include selected module
+### To Include the selected module
 
 ```xml
 
@@ -28,9 +28,9 @@ project by adding the following to your `pom.xml`:
 
 ## Modules
 
-| Module Name                                                                         | Description                                                                                                                |
-|-------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| [commons-archive](https://github.com/deepakdaneva/commons/tree/main/common-archive) | Set of utilities for working with compressed and archived files. It can help you handle various archive formats with ease. |
+| Module Name                                                                          | Description                                                                                                                |
+|--------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| [commons-archive](https://github.com/deepakdaneva/commons/tree/main/commons-archive) | Set of utilities for working with compressed and archived files. It can help you handle various archive formats with ease. |
 
 ## License
 

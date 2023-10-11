@@ -1,4 +1,4 @@
-# [commons-archive](https://github.com/deepakdaneva/commons/tree/main/common-archive)
+# [commons-archive](https://github.com/deepakdaneva/commons/tree/main/commons-archive)
 
 Set of utilities for working with compressed and archived files. It can help you handle various archive formats with
 ease.
@@ -11,7 +11,7 @@ ease.
 
 ## Getting Started
 
-To get started with [commons-archive](https://github.com/deepakdaneva/commons/tree/main/common-archive), you can add it
+To get started with [commons-archive](https://github.com/deepakdaneva/commons/tree/main/commons-archive), you can add it
 as a dependency in your Maven project by adding the following to your `pom.xml`:
 
 ```xml
