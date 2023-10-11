@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.deepakdaneva</groupId>
+        <artifactId>commons</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <groupId>io.github.deepakdaneva.commons</groupId>
+    <artifactId>commons-archive</artifactId>
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>Set of utilities for working with compressed and archived files. It can help you handle various archive
+        formats with ease.
+    </description>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>deepakdaneva</id>
+            <name>Deepak Kumar Jangir</name>
+            <url>https://deepakdaneva.github.io</url>
+            <roles>
+                <role>Senior Software Engineer</role>
+            </roles>
+            <timezone>GMT+5:30</timezone>
+        </developer>
+    </developers>
+    <dependencies>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- TEST DEPENDENCIES -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <resources>
+            <resource>
+                <directory>${basedir}</directory>
+                <includes>
+                    <include>NOTICE</include>
+                    <include>LICENSE</include>
+                </includes>
+                <targetPath>META-INF</targetPath>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Implementation-Title>${project.artifactId}</Implementation-Title>
+                            <Specification-Title>${project.artifactId}</Specification-Title>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

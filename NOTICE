@@ -1,0 +1,24 @@
+NOTICE
+
+This project includes the following third-party components:
+
+1. Apache Commons - Compress
+   - Website: https://commons.apache.org/proper/commons-compress
+   - License: https://www.apache.org/licenses/LICENSE-2.0.txt
+   - Copyright (c) The Apache Software Foundation
+
+2. Apache Commons - IO
+   - Website: https://commons.apache.org/proper/commons-io
+   - License: https://www.apache.org/licenses/LICENSE-2.0.txt
+   - Copyright (c) The Apache Software Foundation
+
+2. JUnit 5
+   - Website: https://junit.org/junit5
+   - License: https://www.eclipse.org/legal/epl-v20.html
+   - Copyright (c) The JUnit Team
+
+Please refer to the respective websites and licenses for more details on the usage and licensing terms of these components.
+
+Deepak Kumar Jangir
+[https://deepakdaneva.github.io](https://deepakdaneva.github.io)
+11th October 2023
