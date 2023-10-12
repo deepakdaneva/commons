@@ -17,7 +17,7 @@ as a dependency in your Maven project by adding the following to your `pom.xml`:
 ```xml
 
 <dependency>
-    <groupId>com.deepakdaneva.commons</groupId>
+    <groupId>io.github.deepakdaneva.commons</groupId>
     <artifactId>commons-archive</artifactId>
     <version>1.0.0</version> <!-- Replace with the latest version -->
 </dependency>

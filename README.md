@@ -20,7 +20,7 @@ project by adding the following to your `pom.xml`:
 ```xml
 
 <dependency>
-    <groupId>com.deepakdaneva.commons</groupId>
+    <groupId>io.github.deepakdaneva.commons</groupId>
     <artifactId>commons-archive</artifactId> <!-- Replace with the required module -->
     <version>1.0.0</version> <!-- Replace with the latest version -->
 </dependency>
