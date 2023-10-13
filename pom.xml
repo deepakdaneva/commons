@@ -21,6 +21,7 @@
         <maven.deploy.plugin.version>3.1.1</maven.deploy.plugin.version>
         <maven.jar.plugin.version>3.3.0</maven.jar.plugin.version>
         <maven.nexus.staging.plugin.version>1.6.13</maven.nexus.staging.plugin.version>
+        <maven.spotless.plugin.version>2.35.0</maven.spotless.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <commons-compress.version>1.24.0</commons-compress.version>
         <commons-io.version>2.13.0</commons-io.version>
@@ -89,6 +90,30 @@
                                 </manifestEntries>
                             </archive>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.diffplug.spotless</groupId>
+                        <artifactId>spotless-maven-plugin</artifactId>
+                        <version>${maven.spotless.plugin.version}</version>
+                        <configuration>
+                            <!-- define a language-specific format -->
+                            <java>
+                                <eclipse>
+                                    <file>${project.basedir}/eclipse-formatter.xml</file>
+                                </eclipse>
+                                <licenseHeader>
+                                    <file>${project.basedir}/license-header</file>
+                                </licenseHeader>
+                            </java>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>apply</goal>
+                                </goals>
+                                <phase>compile</phase>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -169,6 +194,30 @@
                             </archive>
                         </configuration>
                     </plugin>
+                    <plugin>
+                        <groupId>com.diffplug.spotless</groupId>
+                        <artifactId>spotless-maven-plugin</artifactId>
+                        <version>${maven.spotless.plugin.version}</version>
+                        <configuration>
+                            <!-- define a language-specific format -->
+                            <java>
+                                <eclipse>
+                                    <file>${project.basedir}/eclipse-formatter.xml</file>
+                                </eclipse>
+                                <licenseHeader>
+                                    <file>${project.basedir}/license-header</file>
+                                </licenseHeader>
+                            </java>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>apply</goal>
+                                </goals>
+                                <phase>compile</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -248,6 +297,30 @@
                                 </manifestEntries>
                             </archive>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.diffplug.spotless</groupId>
+                        <artifactId>spotless-maven-plugin</artifactId>
+                        <version>${maven.spotless.plugin.version}</version>
+                        <configuration>
+                            <!-- define a language-specific format -->
+                            <java>
+                                <eclipse>
+                                    <file>${project.basedir}/eclipse-formatter.xml</file>
+                                </eclipse>
+                                <licenseHeader>
+                                    <file>${project.basedir}/license-header</file>
+                                </licenseHeader>
+                            </java>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>apply</goal>
+                                </goals>
+                                <phase>compile</phase>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
