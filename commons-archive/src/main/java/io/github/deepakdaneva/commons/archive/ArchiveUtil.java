@@ -39,6 +39,7 @@ import org.apache.commons.io.IOUtils;
  */
 public class ArchiveUtil {
 
+    /** Split Delimiter for mime type */
     public static final String SEMICOLON = ";";
     /** List of COMPRESSOR FILE Mime-Types. */
     public static final Set<String> COMPRESSOR_MIME_TYPES = Set.of("application/zlib", "application/x-gzip", "application/x-bzip2", "application/x-compress", "application/x-java-pack200", "application/x-lzma", "application/deflate64", "application/x-lz4", "application/x-snappy", "application/x-brotli", "application/gzip", "application/x-bzip", "application/x-xz");

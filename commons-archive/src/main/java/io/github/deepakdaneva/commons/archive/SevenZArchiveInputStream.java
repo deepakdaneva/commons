@@ -28,6 +28,12 @@ import org.apache.commons.io.IOUtils;
 public class SevenZArchiveInputStream extends ArchiveInputStream {
     private final SevenZFile sevenZFile;
 
+    /**
+     * If the input stream is already detected as a 7z, An instance of 7z InputStream can be provided to work with it.
+     * 
+     * @param inputStream underlysing input stream of the 7z file
+     * @throws IOException any IO exception raised during the construction of the instance
+     */
     public SevenZArchiveInputStream(final InputStream inputStream) throws IOException {
         SeekableInMemoryByteChannel inMemoryByteChannel = new SeekableInMemoryByteChannel(IOUtils.toByteArray(inputStream));
         this.sevenZFile = new SevenZFile(inMemoryByteChannel);

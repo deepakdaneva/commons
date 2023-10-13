@@ -30,6 +30,13 @@ import org.junit.jupiter.api.Test;
  */
 public class TestArchiveUtil {
 
+    /**
+     * Test {@code 'application/zip'} file
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void testZip() throws IOException, CompressorException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file_zip").toString()));
@@ -38,6 +45,13 @@ public class TestArchiveUtil {
         IOUtils.closeQuietly(ais, is);
     }
 
+    /**
+     * Test {@code 'application/gzip'} file
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void testTar() throws CompressorException, IOException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file_tar_gz").toString()));
@@ -46,6 +60,13 @@ public class TestArchiveUtil {
         IOUtils.closeQuietly(ais, is);
     }
 
+    /**
+     * Test {@code 'application/x-7z-compressed'} file
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void test7Zip() throws IOException, CompressorException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file_7z").toString()));
@@ -54,6 +75,13 @@ public class TestArchiveUtil {
         IOUtils.closeQuietly(ais, is);
     }
 
+    /**
+     * Test {@code 'text/plain'} file with wrong {@code 'application/zip'} mime type
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void testNonZip() throws IOException, CompressorException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file").toString()));
@@ -63,6 +91,13 @@ public class TestArchiveUtil {
         IOUtils.closeQuietly(is);
     }
 
+    /**
+     * Test {@code 'text/plain'} file with wrong {@code 'application/x-7z-compressed'} mime type
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void testNon7Zip() throws IOException, CompressorException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file").toString()));
@@ -72,6 +107,13 @@ public class TestArchiveUtil {
         IOUtils.closeQuietly(is);
     }
 
+    /**
+     * Test {@code 'text/plain'} file with wrong {@code 'application/gzip'} mime type
+     * 
+     * @throws IOException io excepion
+     * @throws CompressorException compress exception
+     * @throws ArchiveException archive exception
+     */
     @Test
     public void testNonTar() throws CompressorException, IOException, ArchiveException {
         InputStream is = new BufferedInputStream(new FileInputStream(TestConstants.TEST_FILES_PATH.resolve("testfiles/txt_file").toString()));

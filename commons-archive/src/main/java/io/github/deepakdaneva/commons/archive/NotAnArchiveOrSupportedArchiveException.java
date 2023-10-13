@@ -19,10 +19,21 @@ package io.github.deepakdaneva.commons.archive;
  */
 public class NotAnArchiveOrSupportedArchiveException extends RuntimeException {
 
+    /**
+     * Constructor with exception message as a argument
+     * 
+     * @param message message of the exception
+     */
     public NotAnArchiveOrSupportedArchiveException(String message) {
         super(message);
     }
 
+    /**
+     * Constructor with exception message and throwable instance as a argument
+     * 
+     * @param message message of the exception
+     * @param throwable throwable instance of the exception
+     */
     public NotAnArchiveOrSupportedArchiveException(String message, Throwable throwable) {
         super(message, throwable);
     }

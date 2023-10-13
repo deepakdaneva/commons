@@ -20,6 +20,12 @@ import java.nio.file.Path;
  * @since 1
  */
 public class TestConstants {
+    /**
+     * Base string of path directory to pick resources from.
+     */
     public static final String TEST_FILES_DIR = "src/test/resources";
+    /**
+     * Base path instance of the directory to pick resources from.
+     */
     public static final Path TEST_FILES_PATH = Path.of(TEST_FILES_DIR);
 }

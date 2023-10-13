@@ -18,6 +18,12 @@ package io.github.deepakdaneva.commons.archive;
  * @since 1
  */
 public class PasswordProtectedArchiveException extends RuntimeException {
+    /**
+     * Constructor with exception message and throwable instance as a argument
+     * 
+     * @param message message of the exception
+     * @param throwable throwable instance
+     */
     public PasswordProtectedArchiveException(String message, Throwable throwable) {
         super(message, throwable);
     }
