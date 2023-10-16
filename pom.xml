@@ -30,7 +30,7 @@
         <impl.spec.vendor>Deepak Kumar Jangir</impl.spec.vendor>
         <impl.spec.vendor.id>io.github.deepakdaneva</impl.spec.vendor.id>
         <impl.spec.version>${project.version}</impl.spec.version>
-        <release.type>beta</release.type>
+        <release.type>development</release.type>
     </properties>
     <licenses>
         <license>
