@@ -1,5 +1,9 @@
 # [commons](https://github.com/deepakdaneva/commons)
 
+---
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.deepakdaneva.commons/commons-archive/badge.svg?gav=true)](https://maven-badges.herokuapp.com/maven-central/io.github.deepakdaneva.commons/commons-archive/?gav=true)
+[![Java Docs](https://javadoc.io/badge/io.github.deepakdaneva.commons/commons-archive/latest.svg)](https://javadoc.io/doc/io.github.deepakdaneva.commons/commons-archive/latest/index.html)
+
 It is a collection of common Java utilities that can simplify various tasks in your Java projects. This library is
 designed to make your development process more efficient and your code cleaner.
 
