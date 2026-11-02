@@ -24,7 +24,7 @@
         <maven.spotless.plugin.version>2.35.0</maven.spotless.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <commons-compress.version>1.24.0</commons-compress.version>
-        <commons-io.version>2.13.0</commons-io.version>
+        <commons-io.version>2.14.0</commons-io.version>
         <junit-jupiter.version>5.10.0</junit-jupiter.version>
         <!-- MANIFEST.MF PROPERTIES -->
         <impl.spec.vendor>Deepak Kumar Jangir</impl.spec.vendor>
