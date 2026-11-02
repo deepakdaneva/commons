@@ -1,37 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>io.github.deepakdaneva</groupId>
         <artifactId>commons</artifactId>
-        <version>1.0.1-SNAPSHOT</version>
+        <version>1.1.0-SNAPSHOT</version>
     </parent>
+
     <groupId>io.github.deepakdaneva.commons</groupId>
     <artifactId>commons-archive</artifactId>
+
     <name>${project.groupId}:${project.artifactId}</name>
-    <description>Set of utilities for working with compressed and archived files. It can help you handle various archive
-        formats with ease.
+    <description>Utilities for detecting and reading compressed and archived content (zip, tar, 7z, gzip, bzip2, xz and
+        more) on top of Apache Commons Compress.
     </description>
-    <licenses>
-        <license>
-            <name>The Apache Software License, Version 2.0</name>
-            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
-        </license>
-    </licenses>
-    <developers>
-        <developer>
-            <id>deepakdaneva</id>
-            <name>Deepak Kumar Jangir</name>
-            <url>https://deepakdaneva.github.io</url>
-            <roles>
-                <role>Senior Software Engineer</role>
-            </roles>
-            <timezone>GMT+5:30</timezone>
-        </developer>
-    </developers>
+
     <dependencies>
+        <!--
+            Provided scope: the consuming application chooses (and upgrades) its own Commons Compress / Commons IO
+            versions. They are not pulled in transitively, so consumers must declare them explicitly.
+        -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
@@ -43,17 +33,28 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- TEST DEPENDENCIES -->
+        <!-- Test dependencies -->
+        <!-- Commons Compress needs xz on the class path to decode any 7z entry; consumers reading 7z must add it too. -->
+        <dependency>
+            <groupId>org.tukaani</groupId>
+            <artifactId>xz</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
     <build>
         <resources>
             <resource>
-                <directory>${basedir}</directory>
+                <directory>${project.basedir}/src/main/resources</directory>
+            </resource>
+            <!-- Ship the license and notice inside the jar. -->
+            <resource>
+                <directory>${project.basedir}</directory>
                 <includes>
                     <include>NOTICE</include>
                     <include>LICENSE</include>
@@ -61,42 +62,5 @@
                 <targetPath>META-INF</targetPath>
             </resource>
         </resources>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <Implementation-Title>${project.artifactId}</Implementation-Title>
-                            <Specification-Title>${project.artifactId}</Specification-Title>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <configuration>
-                    <!-- define a language-specific format -->
-                    <java>
-                        <eclipse>
-                            <file>${project.parent.basedir}/eclipse-formatter.xml</file>
-                        </eclipse>
-                        <licenseHeader>
-                            <file>${project.parent.basedir}/license-header</file>
-                        </licenseHeader>
-                    </java>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>apply</goal>
-                        </goals>
-                        <phase>compile</phase>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
     </build>
 </project>
