@@ -19,6 +19,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.compress.PasswordRequiredException;
@@ -33,233 +34,360 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 
 /**
+ * Static helpers for recognising archive / compressor MIME types and for opening the matching Apache Commons Compress
+ * streams.
+ * <p>
+ * Supported inputs:
+ * <ul>
+ * <li><b>Archives</b> ({@code zip}, {@code jar}, {@code tar}, {@code ar}, {@code arj}, {@code cpio}, {@code dump}) are
+ * opened with {@link ArchiveStreamFactory} using signature auto-detection.</li>
+ * <li><b>7z</b> archives are opened with {@link SevenZArchiveInputStream}, which buffers the whole archive in memory
+ * because the 7z format requires random access. Decoding 7z entries requires the optional {@code org.tukaani:xz}
+ * library on the class path.</li>
+ * <li><b>Compressed streams</b> ({@code gzip}, {@code bzip2}, {@code xz}, {@code lzma}, {@code brotli}, ...) are
+ * decompressed with {@link CompressorStreamFactory} and the result is read as a TAR archive.</li>
+ * <li><b>RAR</b> is recognised by {@link #isRarMimeType(String)} but cannot be opened (Commons Compress has no RAR
+ * support); {@link #getArchiveInputStream(InputStream, String)} rejects it with
+ * {@link NotAnArchiveOrSupportedArchiveException}.</li>
+ * </ul>
+ * <p>
+ * MIME type arguments are matched case-insensitively and any parameters (for example {@code ;charset=UTF-8}) are
+ * ignored. Encrypted content is reported with {@link PasswordProtectedArchiveException}; the one exception is an
+ * encrypted 7z entry (with unencrypted headers), for which {@link ArchiveInputStream#getNextEntry()} already throws
+ * Commons Compress' {@link PasswordRequiredException}.
+ * <p>
+ * This class never extracts entries to the file system, so it is not itself exposed to path traversal ("zip slip").
+ * Callers that write entries to disk must validate each {@link org.apache.commons.compress.archivers.ArchiveEntry#getName()
+ * entry name} against the target directory themselves.
+ *
  * @author Deepak Kumar Jangir
- * @version 1
- * @since 1
+ * @since 1.0.0
  */
 public class ArchiveUtil {
 
-    /** Split Delimiter for mime type */
+    /** Separator between a MIME type and its parameters, for example {@code application/zip; charset=UTF-8}. */
     public static final String SEMICOLON = ";";
-    /** List of COMPRESSOR FILE Mime-Types. */
+
+    /** MIME types of single-stream compression formats that are decompressed and then read as TAR archives. */
     public static final Set<String> COMPRESSOR_MIME_TYPES = Set.of("application/zlib", "application/x-gzip", "application/x-bzip2", "application/x-compress", "application/x-java-pack200", "application/x-lzma", "application/deflate64", "application/x-lz4", "application/x-snappy", "application/x-brotli", "application/gzip", "application/x-bzip", "application/x-xz");
-    /** 7z File Mime-Type. */
+
+    /** 7z MIME type. */
     private static final String SEVENZ_MIME_TYPE = "application/x-7z-compressed";
-    /** RAR File Mime-Type. */
+
+    /** RAR MIME type. */
     private static final String RAR_MIME_TYPE = "application/x-rar-compressed";
-    /** List of ARCHIVE File Mime-Types. */
+
+    /** MIME types of multi-entry archive formats (including 7z and RAR). */
     private static final Set<String> ARCHIVE_MIME_TYPES = Set.of("application/x-tar", "application/x-gtar", "application/java-archive", "application/x-arj", "application/x-archive", "application/zip", "application/x-cpio", "application/x-tika-unix-dump", SEVENZ_MIME_TYPE, RAR_MIME_TYPE);
 
+    /** Message used for every "not an archive" failure. */
+    private static final String NOT_AN_ARCHIVE_MESSAGE = "Not an archive or an unsupported archive file.";
+
+    /** Message used for every password / encryption failure. */
+    private static final String PASSWORD_PROTECTED_MESSAGE = "Password protected archive/entries not supported";
+
+    // Commons Compress signals "unknown format" only through these exception messages.
+    private static final String NO_ARCHIVER_FOUND = "No Archiver found for the stream signature";
+    private static final String NO_COMPRESSOR_FOUND = "No Compressor found for the stream signature";
+    private static final String BAD_7Z_SIGNATURE = "Bad 7z signature";
+
     /**
-     * This method validates whether the provided mime type is an archive/compressed/rar mime type
-     * or not.
+     * Creates a new instance.
      *
-     * @param mimeType which needs to be validated.
-     * @return true if provided mime-type is an archive or compressed or rar file mime type else
-     * false.
+     * @deprecated this is a static utility class and does not need to be instantiated; the constructor is kept only for
+     * backward compatibility.
+     */
+    @Deprecated
+    public ArchiveUtil() {
+        // Kept public for binary compatibility with 1.0.0.
+    }
+
+    /**
+     * Tells whether the MIME type denotes an archive, a compressed stream or a RAR file.
+     *
+     * @param mimeType MIME type to check, may be {@code null}.
+     * @return {@code true} if {@link #isArchiveMimeType(String)}, {@link #isCompressorMimeType(String)} or
+     * {@link #isRarMimeType(String)} returns {@code true}.
      */
     public static boolean isAnyArchiveMimeType(final String mimeType) {
         return isArchiveMimeType(mimeType) || isCompressorMimeType(mimeType) || isRarMimeType(mimeType);
     }
 
     /**
-     * This method validates whether the provided mime type is an compressed mime type or not.
-     * {@link ArchiveUtil#ARCHIVE_MIME_TYPES}
+     * Tells whether the MIME type denotes a multi-entry archive format (zip, jar, tar, ar, arj, cpio, dump, 7z or RAR).
      *
-     * @param mimeType which needs to be validated.
-     * @return true if provided mime-type is an archive file mime type else false.
+     * @param mimeType MIME type to check, may be {@code null}.
+     * @return {@code true} if the MIME type is a known archive MIME type.
      */
     public static boolean isArchiveMimeType(final String mimeType) {
-        return ARCHIVE_MIME_TYPES.contains(Objects.nonNull(mimeType) ? mimeType.split(SEMICOLON)[0] : null);
+        return matches(ARCHIVE_MIME_TYPES, mimeType);
     }
 
     /**
-     * This method validates whether the provided mime type is an compressed mime type or not.
-     * {@link ArchiveUtil#COMPRESSOR_MIME_TYPES}
+     * Tells whether the MIME type denotes a single-stream compression format listed in {@link #COMPRESSOR_MIME_TYPES}.
      *
-     * @param mimeType which needs to be validated.
-     * @return true if provided mime-type is an compressed file mime type else false.
+     * @param mimeType MIME type to check, may be {@code null}.
+     * @return {@code true} if the MIME type is a known compressor MIME type.
      */
     public static boolean isCompressorMimeType(final String mimeType) {
-        return COMPRESSOR_MIME_TYPES.contains(Objects.nonNull(mimeType) ? mimeType.split(SEMICOLON)[0] : null);
+        return matches(COMPRESSOR_MIME_TYPES, mimeType);
     }
 
     /**
-     * This method validates whether the provided mime type is an rar mime type or not. {@link
-     * ArchiveUtil#RAR_MIME_TYPE}
+     * Tells whether the MIME type is the RAR MIME type ({@code application/x-rar-compressed}).
      *
-     * @param mimeType which needs to be validated.
-     * @return true if provided mime-type is a rar file mime type else false.
+     * @param mimeType MIME type to check, may be {@code null}.
+     * @return {@code true} if the MIME type denotes a RAR file.
      */
     public static boolean isRarMimeType(final String mimeType) {
-        return RAR_MIME_TYPE.equals(Objects.nonNull(mimeType) ? mimeType.split(SEMICOLON)[0] : null);
+        return RAR_MIME_TYPE.equals(baseMimeType(mimeType));
     }
 
     /**
-     * This method validates whether the provided mime type is an 7z mime type or not. {@link
-     * ArchiveUtil#SEVENZ_MIME_TYPE}
+     * Tells whether the MIME type is the 7z MIME type ({@code application/x-7z-compressed}).
      *
-     * @param mimeType which needs to be validated.
-     * @return true if provided mime-type is a 7z file mime type else false.
+     * @param mimeType MIME type to check, may be {@code null}.
+     * @return {@code true} if the MIME type denotes a 7z file.
      */
     public static boolean is7zMimeType(final String mimeType) {
-        return SEVENZ_MIME_TYPE.equals(Objects.nonNull(mimeType) ? mimeType.split(SEMICOLON)[0] : null);
+        return SEVENZ_MIME_TYPE.equals(baseMimeType(mimeType));
     }
 
     /**
-     * This method return the actual name which can be used by Apache Commons Compress library to
-     * create actual brotli/lzma CompressorInputStream.
+     * Returns the Commons Compress compressor name for Brotli or LZMA content. These two formats cannot be detected from
+     * the stream signature, so the name has to be passed explicitly to
+     * {@link #getCompressorInputStream(InputStream, String)}.
      *
-     * @param mimeType string to check if it contains {@code brotli} or {@code lzma} sub string.
-     * @return null or {@link CompressorStreamFactory#BROTLI}/{@link CompressorStreamFactory#LZMA}.
+     * @param mimeType MIME type to inspect, may be {@code null}.
+     * @return {@link CompressorStreamFactory#getBrotli()} if the MIME type contains {@code brotli},
+     * {@link CompressorStreamFactory#getLzma()} if it contains {@code lzma}, otherwise {@code null}.
      */
     public static String getBrotliOrLzmaName(final String mimeType) {
-        if (Objects.isNull(mimeType)) {
+        final String base = baseMimeType(mimeType);
+        if (base == null) {
             return null;
-        } else if (mimeType.contains("brotli")) {
+        } else if (base.contains("brotli")) {
             return CompressorStreamFactory.getBrotli();
-        } else if (mimeType.contains("lzma")) {
+        } else if (base.contains("lzma")) {
             return CompressorStreamFactory.getLzma();
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * This method provides the {@link ArchiveInputStream} of the InputStream.
-     *
-     * @param inputStream InputStream of the archive file which supports mark and reset, recommended
-     * BufferedInputStream.
-     * @param mimeType of the inputStream, which will be used create proper archive input stream.
-     * @return {@link ArchiveInputStream} instance to work with the archive file.
-     * @throws CompressorException is any compressor exception is raised.
-     * @throws IOException if any IOException is raised.
-     * @throws ArchiveException if any ArchiveException is raised.
-     * @throws NotAnArchiveOrSupportedArchiveException RuntimeException if provided inputStream is
-     * not an archive.
-     * @throws PasswordProtectedArchiveException RuntimeException if any password protected archive
-     * exception raised.
-     */
-    public static ArchiveInputStream getArchiveInputStream(final InputStream inputStream, final String mimeType) throws ArchiveException, IOException, CompressorException, NotAnArchiveOrSupportedArchiveException {
-        if (is7zMimeType(mimeType)) {
-            try {
-                return new SevenZArchiveInputStream(inputStream);
-            } catch (PasswordRequiredException e) {
-                throw new PasswordProtectedArchiveException("Password protected archive/entries not supported", e);
-            } catch (EOFException eofe) {
-                throw new NotAnArchiveOrSupportedArchiveException("Not an archive or an unsupported archive file.", eofe);
-            } catch (IOException ioe) {
-                if ("Bad 7z signature".equalsIgnoreCase(ioe.getMessage())) {
-                    throw new NotAnArchiveOrSupportedArchiveException("Not an archive or an unsupported archive file.", ioe);
-                } else {
-                    throw ioe;
-                }
-            }
-        } else if (!isRarMimeType(mimeType) && isArchiveMimeType(mimeType)) {
-            try {
-                return ArchiveStreamFactory.DEFAULT.createArchiveInputStream(inputStream);
-            } catch (ArchiveException ae) {
-                if ("No Archiver found for the stream signature".equalsIgnoreCase(ae.getMessage())) {
-                    throw new NotAnArchiveOrSupportedArchiveException("Not an archive or an unsupported archive file.", ae);
-                } else {
-                    throw ae;
-                }
-            }
-        } else if (isCompressorMimeType(mimeType)) {
-            return new TarArchiveInputStream(getCompressorInputStream(inputStream, getBrotliOrLzmaName(mimeType)));
-        }
-        throw new NotAnArchiveOrSupportedArchiveException("Not an archive or an unsupported archive file.");
-    }
-
-    /**
-     * This method provides the {@link CompressorInputStream} of the InputStream.
-     *
-     * @param inputStream InputStream of the archive file which supports mark and reset, recommended
-     * BufferedInputStream.
-     * @param archiverName which is optional and will only be used in case no CompressorInputStream
-     * are created without using it.
-     * @return {@link CompressorInputStream} instance to work with the archive file or null.
-     * @throws NotAnArchiveOrSupportedArchiveException RuntimeException if provided inputStream is
-     * not an archive.
-     * @throws CompressorException if any compressor exception is raised.
-     */
-    public static CompressorInputStream getCompressorInputStream(final InputStream inputStream, final String archiverName) throws CompressorException {
-        try {
-            if (Objects.nonNull(archiverName)) {
-                return CompressorStreamFactory.getSingleton().createCompressorInputStream(archiverName, inputStream);
-            } else {
-                return CompressorStreamFactory.getSingleton().createCompressorInputStream(inputStream);
-            }
-        } catch (CompressorException ce) {
-            if ("No Compressor found for the stream signature.".equalsIgnoreCase(ce.getMessage())) {
-                throw new NotAnArchiveOrSupportedArchiveException("Not an archive or an unsupported archive file.", ce);
-            } else {
-                throw ce;
-            }
-        }
-    }
-
-    /**
-     * This method provides the ArchiveInputStream of the InputStream.
-     *
-     * @param inputStream InputStream of the archive file which supports mark and reset, recommended
-     * BufferedInputStream.
-     * @param mimeType of the inputStream, which will be used create proper archive input stream.
-     * @param ignoreException if true will return null in case if any exception is raised, else will
-     * throw exception.
-     * @return ArchiveInputStream instance to work with the archive file or null.
-     * @throws CompressorException is any compressor exception is raised.
-     * @throws IOException if any IOException is raised.
-     * @throws ArchiveException if any ArchiveException is raised.
-     * @throws NotAnArchiveOrSupportedArchiveException RuntimeException if provided inputStream is
-     * not an archive.
-     * @throws PasswordProtectedArchiveException RuntimeException if any password protected archive
-     * exception raised.
-     */
-    public static ArchiveInputStream getArchiveInputStream(final InputStream inputStream, final String mimeType, final boolean ignoreException) throws CompressorException, IOException, ArchiveException {
-        try {
-            return getArchiveInputStream(inputStream, mimeType);
-        } catch (Exception e) {
-            if (!ignoreException) throw e;
         }
         return null;
     }
 
     /**
-     * This method creates an input stream of the current entry of the provided ArchiveInputStream.
+     * Opens an {@link ArchiveInputStream} over the given stream, choosing the reader from the MIME type.
+     * <p>
+     * If the stream does not support {@link InputStream#mark(int) mark/reset} (needed for signature detection) it is
+     * wrapped in a {@link BufferedInputStream}. The caller remains responsible for closing both the returned stream and
+     * the original stream. For 7z input the whole stream is read into memory before this method returns.
      *
-     * @param currentArcInStream which is already iterated and is at the position of the current
-     * entry.
-     * @return InputStream (BufferedInputStream) of the current entry of the provided
-     * ArchiveInputStream or null.
-     * @throws IOException in case of any exception during the creation of InputStream.
-     * @throws PasswordProtectedArchiveException if password protected entry is found.
+     * @param inputStream archive content; should support mark/reset (for example a {@link BufferedInputStream}).
+     * @param mimeType MIME type of the content, used to choose the archive reader.
+     * @return a new {@link ArchiveInputStream}, never {@code null}.
+     * @throws ArchiveException if Commons Compress fails to create the archive reader for another reason.
+     * @throws IOException if reading the stream fails.
+     * @throws CompressorException if the compressor stream cannot be created for another reason.
+     * @throws NotAnArchiveOrSupportedArchiveException if the MIME type is not a supported archive/compressor type
+     * (including RAR), or the content does not match a supported format.
+     * @throws PasswordProtectedArchiveException if the 7z archive headers are encrypted.
+     * @throws NullPointerException if {@code inputStream} is {@code null}.
      */
-    public static InputStream getEntryInputStream(final InputStream currentArcInStream) throws IOException {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        try {
-            IOUtils.copy(currentArcInStream, byteArrayOutputStream);
-        } catch (UnsupportedZipFeatureException e) {
-            if (UnsupportedZipFeatureException.Feature.ENCRYPTION.equals(e.getFeature())) {
-                throw new PasswordProtectedArchiveException("Password protected archive/entries not supported", e);
+    @SuppressWarnings("rawtypes")
+    public static ArchiveInputStream getArchiveInputStream(final InputStream inputStream, final String mimeType) throws ArchiveException, IOException, CompressorException, NotAnArchiveOrSupportedArchiveException {
+        Objects.requireNonNull(inputStream, "inputStream");
+        if (is7zMimeType(mimeType)) {
+            return open7z(inputStream);
+        }
+        if (isArchiveMimeType(mimeType) && !isRarMimeType(mimeType)) {
+            try {
+                return ArchiveStreamFactory.DEFAULT.createArchiveInputStream(markSupporting(inputStream));
+            } catch (ArchiveException ae) {
+                if (messageStartsWith(ae, NO_ARCHIVER_FOUND)) {
+                    throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE, ae);
+                }
+                throw ae;
             }
         }
-        return new BufferedInputStream(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
+        if (isCompressorMimeType(mimeType)) {
+            return new TarArchiveInputStream(getCompressorInputStream(inputStream, getBrotliOrLzmaName(mimeType)));
+        }
+        throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE + " MIME type: " + mimeType);
     }
 
     /**
-     * This method closes the list of ArchiveInputStream quietly.
+     * Opens a {@link CompressorInputStream} over the given stream.
+     * <p>
+     * When {@code compressorName} is {@code null} the format is detected from the stream signature; in that case a
+     * stream without mark/reset support is wrapped in a {@link BufferedInputStream}.
      *
-     * @param aisList list of ArchiveInputStream.
+     * @param inputStream compressed content; should support mark/reset (for example a {@link BufferedInputStream}).
+     * @param compressorName optional Commons Compress compressor name (see {@link CompressorStreamFactory}); use it for
+     * formats without a signature such as Brotli or LZMA. May be {@code null} to auto-detect.
+     * @return a new {@link CompressorInputStream}, never {@code null}.
+     * @throws NotAnArchiveOrSupportedArchiveException if no compressor matches the stream signature.
+     * @throws CompressorException if the compressor stream cannot be created for another reason (for example an unknown
+     * {@code compressorName} or a missing optional dependency).
+     * @throws NullPointerException if {@code inputStream} is {@code null}.
      */
-    public static void closeQuietly(List<ArchiveInputStream> aisList) {
-        if (Objects.nonNull(aisList)) {
-            aisList.forEach(ais -> {
-                try {
-                    ais.close();
-                } catch (IOException ignored) {
-                }
-            });
+    public static CompressorInputStream getCompressorInputStream(final InputStream inputStream, final String compressorName) throws CompressorException {
+        Objects.requireNonNull(inputStream, "inputStream");
+        final CompressorStreamFactory factory = CompressorStreamFactory.getSingleton();
+        try {
+            if (compressorName != null) {
+                return factory.createCompressorInputStream(compressorName, inputStream);
+            }
+            return factory.createCompressorInputStream(markSupporting(inputStream));
+        } catch (CompressorException ce) {
+            if (messageStartsWith(ce, NO_COMPRESSOR_FOUND)) {
+                throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE, ce);
+            }
+            throw ce;
         }
+    }
+
+    /**
+     * Same as {@link #getArchiveInputStream(InputStream, String)}, but can return {@code null} instead of throwing.
+     * <p>
+     * Note that on failure the input stream may already have been partially consumed.
+     *
+     * @param inputStream archive content; should support mark/reset (for example a {@link BufferedInputStream}).
+     * @param mimeType MIME type of the content, used to choose the archive reader.
+     * @param ignoreException if {@code true}, any exception is swallowed and {@code null} is returned; if
+     * {@code false}, exceptions are propagated.
+     * @return a new {@link ArchiveInputStream}, or {@code null} if it could not be created and
+     * {@code ignoreException} is {@code true}.
+     * @throws CompressorException see {@link #getArchiveInputStream(InputStream, String)}.
+     * @throws IOException see {@link #getArchiveInputStream(InputStream, String)}.
+     * @throws ArchiveException see {@link #getArchiveInputStream(InputStream, String)}.
+     * @throws NotAnArchiveOrSupportedArchiveException see {@link #getArchiveInputStream(InputStream, String)}.
+     * @throws PasswordProtectedArchiveException see {@link #getArchiveInputStream(InputStream, String)}.
+     */
+    @SuppressWarnings("rawtypes")
+    public static ArchiveInputStream getArchiveInputStream(final InputStream inputStream, final String mimeType, final boolean ignoreException) throws CompressorException, IOException, ArchiveException {
+        try {
+            return getArchiveInputStream(inputStream, mimeType);
+        } catch (Exception e) {
+            if (!ignoreException) {
+                throw e;
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Reads the current entry of an archive stream fully into memory and returns it as a new stream.
+     * <p>
+     * The entry size is not limited; for untrusted input prefer {@link #getEntryInputStream(InputStream, long)} to
+     * guard against decompression bombs.
+     *
+     * @param currentArcInStream archive stream positioned at the entry to read (after
+     * {@link ArchiveInputStream#getNextEntry()}).
+     * @return a {@link BufferedInputStream} over the entry content, never {@code null}.
+     * @throws IOException if reading the entry fails, including when the entry uses an unsupported feature such as an
+     * unknown compression method.
+     * @throws PasswordProtectedArchiveException if the entry is encrypted.
+     * @throws NullPointerException if {@code currentArcInStream} is {@code null}.
+     */
+    public static InputStream getEntryInputStream(final InputStream currentArcInStream) throws IOException {
+        return getEntryInputStream(currentArcInStream, Long.MAX_VALUE);
+    }
+
+    /**
+     * Reads the current entry of an archive stream into memory, failing if it is larger than {@code maxSize} bytes.
+     *
+     * @param currentArcInStream archive stream positioned at the entry to read (after
+     * {@link ArchiveInputStream#getNextEntry()}).
+     * @param maxSize maximum number of uncompressed bytes to read; must be zero or positive.
+     * @return a {@link BufferedInputStream} over the entry content, never {@code null}.
+     * @throws IOException if reading the entry fails, the entry uses an unsupported feature, or the entry is larger
+     * than {@code maxSize} bytes.
+     * @throws PasswordProtectedArchiveException if the entry is encrypted.
+     * @throws NullPointerException if {@code currentArcInStream} is {@code null}.
+     * @throws IllegalArgumentException if {@code maxSize} is negative.
+     * @since 1.1.0
+     */
+    public static InputStream getEntryInputStream(final InputStream currentArcInStream, final long maxSize) throws IOException {
+        Objects.requireNonNull(currentArcInStream, "currentArcInStream");
+        if (maxSize < 0) {
+            throw new IllegalArgumentException("maxSize must not be negative: " + maxSize);
+        }
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try {
+            // Read one byte beyond the limit so that an oversized entry can be told apart from one of exactly maxSize.
+            final long limit = maxSize == Long.MAX_VALUE ? -1 : maxSize + 1;
+            final long copied = IOUtils.copyLarge(currentArcInStream, buffer, 0, limit);
+            if (copied > maxSize) {
+                throw new IOException("Archive entry exceeds the maximum allowed size of " + maxSize + " bytes");
+            }
+        } catch (UnsupportedZipFeatureException e) {
+            if (UnsupportedZipFeatureException.Feature.ENCRYPTION.equals(e.getFeature())) {
+                throw new PasswordProtectedArchiveException(PASSWORD_PROTECTED_MESSAGE, e);
+            }
+            throw e;
+        } catch (PasswordRequiredException e) {
+            throw new PasswordProtectedArchiveException(PASSWORD_PROTECTED_MESSAGE, e);
+        }
+        return new BufferedInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+    }
+
+    /**
+     * Closes every stream in the list, ignoring {@link IOException}s and {@code null} elements.
+     *
+     * @param aisList streams to close, may be {@code null}.
+     */
+    @SuppressWarnings("rawtypes")
+    public static void closeQuietly(final List<ArchiveInputStream> aisList) {
+        if (aisList == null) {
+            return;
+        }
+        for (final ArchiveInputStream ais : aisList) {
+            IOUtils.closeQuietly(ais);
+        }
+    }
+
+    /** Opens a 7z archive and translates Commons Compress failures into this library's exceptions. */
+    private static SevenZArchiveInputStream open7z(final InputStream inputStream) throws IOException {
+        try {
+            return new SevenZArchiveInputStream(inputStream);
+        } catch (PasswordRequiredException e) {
+            throw new PasswordProtectedArchiveException(PASSWORD_PROTECTED_MESSAGE, e);
+        } catch (EOFException e) {
+            // Input shorter than the 7z signature header.
+            throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE, e);
+        } catch (IOException e) {
+            if (messageStartsWith(e, BAD_7Z_SIGNATURE)) {
+                throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE, e);
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Returns the MIME type without parameters, trimmed and lower-cased, or {@code null} if {@code mimeType} is
+     * {@code null}.
+     */
+    private static String baseMimeType(final String mimeType) {
+        if (mimeType == null) {
+            return null;
+        }
+        final int separator = mimeType.indexOf(SEMICOLON);
+        final String base = separator < 0 ? mimeType : mimeType.substring(0, separator);
+        return base.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Null-safe membership test; immutable {@code Set.of} sets reject {@code contains(null)}. */
+    private static boolean matches(final Set<String> mimeTypes, final String mimeType) {
+        final String base = baseMimeType(mimeType);
+        return base != null && mimeTypes.contains(base);
+    }
+
+    /** Returns the stream itself if it supports mark/reset, otherwise a buffered wrapper. */
+    private static InputStream markSupporting(final InputStream inputStream) {
+        return inputStream.markSupported() ? inputStream : new BufferedInputStream(inputStream);
+    }
+
+    private static boolean messageStartsWith(final Exception e, final String prefix) {
+        final String message = e.getMessage();
+        return message != null && message.regionMatches(true, 0, prefix, 0, prefix.length());
     }
 }

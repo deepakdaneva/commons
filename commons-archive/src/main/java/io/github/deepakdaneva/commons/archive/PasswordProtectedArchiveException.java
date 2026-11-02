@@ -13,16 +13,23 @@
 package io.github.deepakdaneva.commons.archive;
 
 /**
+ * Thrown when an archive, or an entry inside it, is encrypted. Password-protected content is not supported.
+ * <p>
+ * This is an unchecked exception so that callers can handle it separately from I/O failures.
+ *
  * @author Deepak Kumar Jangir
- * @version 1
- * @since 1
+ * @since 1.0.0
  */
 public class PasswordProtectedArchiveException extends RuntimeException {
+
+    // Same value as the implicit serialVersionUID of 1.0.0, so serialized instances stay compatible.
+    private static final long serialVersionUID = -8141624677887407616L;
+
     /**
-     * Constructor with exception message and throwable instance as a argument
-     * 
-     * @param message message of the exception
-     * @param throwable throwable instance
+     * Creates an exception with the given message and cause.
+     *
+     * @param message detail message.
+     * @param throwable underlying cause, may be {@code null}.
      */
     public PasswordProtectedArchiveException(String message, Throwable throwable) {
         super(message, throwable);

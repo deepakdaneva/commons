@@ -13,26 +13,33 @@
 package io.github.deepakdaneva.commons.archive;
 
 /**
+ * Thrown when content is not an archive, or is an archive/compression format this library cannot read (for example
+ * RAR, or content whose signature does not match the declared MIME type).
+ * <p>
+ * This is an unchecked exception so that callers can handle it separately from I/O failures.
+ *
  * @author Deepak Kumar Jangir
- * @version 1
- * @since 1
+ * @since 1.0.0
  */
 public class NotAnArchiveOrSupportedArchiveException extends RuntimeException {
 
+    // Same value as the implicit serialVersionUID of 1.0.0, so serialized instances stay compatible.
+    private static final long serialVersionUID = -6933252307440653469L;
+
     /**
-     * Constructor with exception message as a argument
-     * 
-     * @param message message of the exception
+     * Creates an exception with the given message.
+     *
+     * @param message detail message.
      */
     public NotAnArchiveOrSupportedArchiveException(String message) {
         super(message);
     }
 
     /**
-     * Constructor with exception message and throwable instance as a argument
-     * 
-     * @param message message of the exception
-     * @param throwable throwable instance of the exception
+     * Creates an exception with the given message and cause.
+     *
+     * @param message detail message.
+     * @param throwable underlying cause, may be {@code null}.
      */
     public NotAnArchiveOrSupportedArchiveException(String message, Throwable throwable) {
         super(message, throwable);
