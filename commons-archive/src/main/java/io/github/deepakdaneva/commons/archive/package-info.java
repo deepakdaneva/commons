@@ -10,22 +10,13 @@
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package io.github.deepakdaneva.commons.archive;
-
-import java.nio.file.Path;
-
 /**
- * @author Deepak Kumar Jangir
- * @version 1
- * @since 1
+ * Utilities for detecting and reading archives and compressed streams on top of Apache Commons Compress.
+ * <p>
+ * Start with {@link io.github.deepakdaneva.commons.archive.ArchiveUtil}, which maps a MIME type to the matching
+ * Commons Compress reader. Apache Commons Compress and Apache Commons IO are {@code provided} dependencies and must be
+ * on the application class path.
+ *
+ * @since 1.0.0
  */
-public class TestConstants {
-    /**
-     * Base string of path directory to pick resources from.
-     */
-    public static final String TEST_FILES_DIR = "src/test/resources";
-    /**
-     * Base path instance of the directory to pick resources from.
-     */
-    public static final Path TEST_FILES_PATH = Path.of(TEST_FILES_DIR);
-}
+package io.github.deepakdaneva.commons.archive;

@@ -49,3 +49,5 @@
 **/nb-configuration.xml
 # Plugin directory
 **/.quarkus/cli/plugins/
+# Maven wrapper (the wrapper scripts download it on demand)
+.mvn/wrapper/maven-wrapper.jar

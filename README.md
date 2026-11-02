@@ -1,46 +1,128 @@
-# [commons](https://github.com/deepakdaneva/commons)
+# commons
 
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.deepakdaneva.commons/commons-archive/badge.svg?gav=true)](https://maven-badges.herokuapp.com/maven-central/io.github.deepakdaneva.commons/commons-archive/?gav=true)
-[![Java Docs](https://javadoc.io/badge/io.github.deepakdaneva.commons/commons-archive/latest.svg)](https://javadoc.io/doc/io.github.deepakdaneva.commons/commons-archive/latest/index.html)
+[![CI](https://github.com/deepakdaneva/commons/actions/workflows/ci.yml/badge.svg)](https://github.com/deepakdaneva/commons/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.deepakdaneva.commons/commons-archive?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.deepakdaneva.commons/commons-archive)
+[![javadoc](https://javadoc.io/badge2/io.github.deepakdaneva.commons/commons-archive/javadoc.svg)](https://javadoc.io/doc/io.github.deepakdaneva.commons/commons-archive)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-It is a collection of common Java utilities that can simplify various tasks in your Java projects. This library is
-designed to make your development process more efficient and your code cleaner.
+A collection of small, focused Java utilities that take the boilerplate out of everyday tasks. Each module is
+published separately to Maven Central, so you only depend on what you use.
 
-## Table of Contents
+## Table of contents
 
-- [Getting Started](#getting-started)
 - [Modules](#modules)
-- [License](#license)
-- [Notice](#notice)
-
-## Getting Started
-
-To get started with [commons](https://github.com/deepakdaneva/commons), you can add it as a dependency in your Maven
-project by adding the following to your `pom.xml`:
-
-### To Include the selected module
-
-```xml
-
-<dependency>
-    <groupId>io.github.deepakdaneva.commons</groupId>
-    <artifactId>commons-archive</artifactId> <!-- Replace with the required module -->
-    <version>1.0.0</version> <!-- Replace with the latest version -->
-</dependency>
-```
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick example](#quick-example)
+- [Compatibility](#compatibility)
+- [Building from source](#building-from-source)
+- [Contributing](#contributing)
+- [Security](#security)
+- [Changelog](#changelog)
+- [License and notice](#license-and-notice)
 
 ## Modules
 
-| Module Name                                                                          | Description                                                                                                                |
-|--------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| [commons-archive](https://github.com/deepakdaneva/commons/tree/main/commons-archive) | Set of utilities for working with compressed and archived files. It can help you handle various archive formats with ease. |
+| Module                                 | Artifact                                             | Description                                                                                                  |
+|----------------------------------------|------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| [commons-archive](commons-archive/README.md) | `io.github.deepakdaneva.commons:commons-archive` | Detect archive / compressor MIME types and open zip, jar, tar, 7z, gzip, bzip2, xz (and more) streams through Apache Commons Compress. |
 
-## License
+## Requirements
 
-This project is licensed under the Apache License 2.0. For more details, see the [LICENSE](LICENSE) file.
+- Java 11 or newer (tested on 11, 17, 21 and 25).
+- Module-specific runtime dependencies are declared with `provided` scope, so your application chooses their versions.
+  See each module's README for details.
 
-## Notice
+## Installation
 
-This project may use third-party libraries or frameworks that are subject to additional licenses or notices. Please
-review the [NOTICE](NOTICE) file for details on these dependencies. These notices must be included in your project as
-well, as specified by the respective licenses.
+The latest release is **1.1.0**. <!-- x-release-please-version -->
+
+### Maven
+
+```xml
+<dependency>
+    <groupId>io.github.deepakdaneva.commons</groupId>
+    <artifactId>commons-archive</artifactId>
+    <version>1.1.0</version> <!-- x-release-please-version -->
+</dependency>
+```
+
+### Gradle
+
+```groovy
+implementation 'io.github.deepakdaneva.commons:commons-archive:1.1.0' // x-release-please-version
+```
+
+Remember to add the module's `provided` dependencies as well (for `commons-archive`: Apache Commons Compress and
+Apache Commons IO). See [commons-archive/README.md](commons-archive/README.md#installation).
+
+## Quick example
+
+```java
+try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("data.zip")));
+     ArchiveInputStream<?> archive = ArchiveUtil.getArchiveInputStream(in, "application/zip")) {
+    ArchiveEntry entry;
+    while ((entry = archive.getNextEntry()) != null) {
+        System.out.println(entry.getName());
+    }
+}
+```
+
+Compressed single files such as `notes.txt.gz` (no TAR inside) come back as a one-entry
+`CompressedFileArchiveInputStream`, so the same loop reads them too:
+
+```java
+try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("notes.txt.gz")));
+     ArchiveInputStream<?> archive = ArchiveUtil.getArchiveInputStream(in, "application/gzip")) {
+    boolean singleFile = archive instanceof CompressedFileArchiveInputStream; // false for data.tar.gz
+    ArchiveEntry entry = archive.getNextEntry(); // name from the gzip header, or null if not stored
+    byte[] content = ArchiveUtil.getEntryInputStream(archive, 50L * 1024 * 1024).readAllBytes();
+}
+```
+
+More examples are in the [commons-archive README](commons-archive/README.md#usage).
+
+## Compatibility
+
+| commons version | Java baseline | Tested on JDK   | Apache Commons Compress | Apache Commons IO |
+|-----------------|---------------|-----------------|-------------------------|-------------------|
+| 1.1.0           | 11            | 11, 17, 21, 25  | 1.26.0+ (built with 1.28.0) | 2.x (built with 2.22.0) |
+| 1.0.0           | 11            | 11              | 1.24.0                  | 2.13.0            |
+
+## Building from source
+
+The project uses the Maven Wrapper, so no local Maven installation is needed (a JDK 11+ is).
+
+```shell
+git clone https://github.com/deepakdaneva/commons.git
+cd commons
+
+# Compile, run the tests, package the jars and check formatting
+./mvnw verify
+
+# Re-format sources (Eclipse formatter + license header) before committing
+./mvnw spotless:apply
+```
+
+On Windows use `mvnw.cmd` instead of `./mvnw`.
+
+The build fails in the `verify` phase if a source file is not formatted; run `./mvnw spotless:apply` to fix it.
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
+
+## Security
+
+Please do not report security vulnerabilities through public issues. See [SECURITY.md](SECURITY.md) for how to report
+them privately.
+
+## Changelog
+
+Release notes are kept in [CHANGELOG.md](CHANGELOG.md).
+
+## License and notice
+
+Licensed under the [Apache License, Version 2.0](LICENSE). Third-party attributions are listed in [NOTICE](NOTICE).
+
+Copyright (C) 2023 Deepak Kumar Jangir
