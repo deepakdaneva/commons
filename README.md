@@ -68,6 +68,18 @@ try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("data
 }
 ```
 
+Compressed single files such as `notes.txt.gz` (no TAR inside) come back as a one-entry
+`CompressedFileArchiveInputStream`, so the same loop reads them too:
+
+```java
+try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("notes.txt.gz")));
+     ArchiveInputStream<?> archive = ArchiveUtil.getArchiveInputStream(in, "application/gzip")) {
+    boolean singleFile = archive instanceof CompressedFileArchiveInputStream; // false for data.tar.gz
+    ArchiveEntry entry = archive.getNextEntry(); // name from the gzip header, or null if not stored
+    byte[] content = ArchiveUtil.getEntryInputStream(archive, 50L * 1024 * 1024).readAllBytes();
+}
+```
+
 More examples are in the [commons-archive README](commons-archive/README.md#usage).
 
 ## Compatibility

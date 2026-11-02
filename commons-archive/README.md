@@ -17,8 +17,10 @@ exceptions for unsupported, malformed and password-protected content.
 - One entry point, `ArchiveUtil.getArchiveInputStream(InputStream, String)`, for:
   - archives: zip, jar, tar, ar, arj, cpio, dump (format detected from the stream signature);
   - 7z, via `SevenZArchiveInputStream`, a streaming `ArchiveInputStream` view of `SevenZFile`;
-  - compressed tarballs: gzip, bzip2, xz, lzma, brotli and the other formats in `ArchiveUtil.COMPRESSOR_MIME_TYPES`
-    that Commons Compress can read.
+  - compressed content: gzip, bzip2, xz, lzma, brotli and the other formats in `ArchiveUtil.COMPRESSOR_MIME_TYPES`
+    that Commons Compress can read. A compressed tarball (`.tar.gz`, `.tar.xz`, ...) is read as a TAR archive; a
+    compressed single file (`notes.txt.gz`, `data.csv.bz2`, ...) is read as a one-entry
+    `CompressedFileArchiveInputStream`.
 - `getCompressorInputStream` to decompress a single compressed stream (auto-detected or by name).
 - `getEntryInputStream` to copy the current entry into memory, with an optional size limit against decompression bombs.
 - Dedicated unchecked exceptions: `NotAnArchiveOrSupportedArchiveException` and `PasswordProtectedArchiveException`.
@@ -128,7 +130,35 @@ try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("uplo
 ```
 
 `getArchiveInputStream` also declares the checked `IOException`, `ArchiveException` and `CompressorException`.
-Compressed MIME types such as `application/gzip` are decompressed and the result is read as a TAR archive.
+Compressed MIME types such as `application/gzip` are decompressed; if the result is a TAR archive it is read as one,
+otherwise it is returned as a single entry (see the next section).
+
+### Read a compressed single file
+
+A compressed file that does not contain a TAR archive (for example `notes.txt.gz`, `data.csv.bz2` or `log.xz`) is
+returned as a `CompressedFileArchiveInputStream` with exactly one entry, so the loop above works unchanged. Use
+`instanceof` to tell it apart from a compressed tarball:
+
+```java
+try (InputStream in = new BufferedInputStream(Files.newInputStream(Path.of("notes.txt.gz")));
+     ArchiveInputStream<?> archive = ArchiveUtil.getArchiveInputStream(in, "application/gzip")) {
+    if (archive instanceof CompressedFileArchiveInputStream) {
+        ArchiveEntry entry = archive.getNextEntry(); // always exactly one entry
+        // gzip may store the original file name; bzip2, xz and the other formats do not (null)
+        String name = entry.getName() != null ? entry.getName() : "notes.txt";
+        try (InputStream content = ArchiveUtil.getEntryInputStream(archive, maxEntrySize)) {
+            // decompressed bytes of notes.txt
+        }
+    } else {
+        // a compressed TAR archive: iterate over its entries as usual
+    }
+}
+```
+
+The single entry has an unknown size (`ArchiveEntry.SIZE_UNKNOWN`) and modification date (`null`), and it is streamed
+rather than buffered, so `getEntryInputStream(archive, maxSize)` guards against decompression bombs as usual. Compressed
+empty content yields one empty entry. To decide between the two cases, the first 1024 decompressed bytes are inspected:
+a `ustar` header, a pre-POSIX TAR header with a valid checksum, or the all-zero end marker of an empty TAR means TAR.
 
 ### Return `null` instead of throwing
 

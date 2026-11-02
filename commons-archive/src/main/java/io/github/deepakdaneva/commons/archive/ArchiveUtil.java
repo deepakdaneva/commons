@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -27,10 +28,13 @@ import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveStreamFactory;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.apache.commons.compress.archivers.tar.TarUtils;
 import org.apache.commons.compress.archivers.zip.UnsupportedZipFeatureException;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.io.IOUtils;
 
 /**
@@ -45,7 +49,9 @@ import org.apache.commons.io.IOUtils;
  * because the 7z format requires random access. Decoding 7z entries requires the optional {@code org.tukaani:xz}
  * library on the class path.</li>
  * <li><b>Compressed streams</b> ({@code gzip}, {@code bzip2}, {@code xz}, {@code lzma}, {@code brotli}, ...) are
- * decompressed with {@link CompressorStreamFactory} and the result is read as a TAR archive.</li>
+ * decompressed with {@link CompressorStreamFactory}. If the decompressed content is a TAR archive (for example
+ * {@code .tar.gz}) it is read with {@link TarArchiveInputStream}; otherwise it is a compressed single file (for example
+ * {@code notes.txt.gz}) and is exposed as a one-entry {@link CompressedFileArchiveInputStream}.</li>
  * <li><b>RAR</b> is recognised by {@link #isRarMimeType(String)} but cannot be opened (Commons Compress has no RAR
  * support); {@link #getArchiveInputStream(InputStream, String)} rejects it with
  * {@link NotAnArchiveOrSupportedArchiveException}.</li>
@@ -68,7 +74,10 @@ public class ArchiveUtil {
     /** Separator between a MIME type and its parameters, for example {@code application/zip; charset=UTF-8}. */
     public static final String SEMICOLON = ";";
 
-    /** MIME types of single-stream compression formats that are decompressed and then read as TAR archives. */
+    /**
+     * MIME types of single-stream compression formats. Their content is decompressed and then read either as a TAR
+     * archive or, if it is not one, as a single file (see {@link #getArchiveInputStream(InputStream, String)}).
+     */
     public static final Set<String> COMPRESSOR_MIME_TYPES = Set.of("application/zlib", "application/x-gzip", "application/x-bzip2", "application/x-compress", "application/x-java-pack200", "application/x-lzma", "application/deflate64", "application/x-lz4", "application/x-snappy", "application/x-brotli", "application/gzip", "application/x-bzip", "application/x-xz");
 
     /** 7z MIME type. */
@@ -90,6 +99,9 @@ public class ArchiveUtil {
     private static final String NO_ARCHIVER_FOUND = "No Archiver found for the stream signature";
     private static final String NO_COMPRESSOR_FOUND = "No Compressor found for the stream signature";
     private static final String BAD_7Z_SIGNATURE = "Bad 7z signature";
+
+    /** Number of decompressed bytes inspected to decide whether compressed content is a TAR archive (two records). */
+    private static final int TAR_PEEK_SIZE = 1024;
 
     /**
      * Creates a new instance.
@@ -180,12 +192,25 @@ public class ArchiveUtil {
      * If the stream does not support {@link InputStream#mark(int) mark/reset} (needed for signature detection) it is
      * wrapped in a {@link BufferedInputStream}. The caller remains responsible for closing both the returned stream and
      * the original stream. For 7z input the whole stream is read into memory before this method returns.
+     * <p>
+     * For a compressor MIME type (see {@link #isCompressorMimeType(String)}) the content is decompressed and the first
+     * 1024 decompressed bytes are inspected:
+     * <ul>
+     * <li>if they start a TAR archive (a POSIX/GNU {@code ustar} header, a pre-POSIX header with a valid checksum, or the
+     * all-zero end-of-archive marker of an empty TAR), a {@link TarArchiveInputStream} is returned, as in 1.0.0;</li>
+     * <li>otherwise the content is a compressed single file (for example {@code notes.txt.gz}) and a
+     * {@link CompressedFileArchiveInputStream} with exactly one entry, whose content is the decompressed payload, is
+     * returned. Compressed empty content yields one empty entry.</li>
+     * </ul>
+     * Use {@code instanceof CompressedFileArchiveInputStream} to tell the two cases apart.
      *
      * @param inputStream archive content; should support mark/reset (for example a {@link BufferedInputStream}).
      * @param mimeType MIME type of the content, used to choose the archive reader.
-     * @return a new {@link ArchiveInputStream}, never {@code null}.
+     * @return a new {@link ArchiveInputStream}, never {@code null}: a {@link TarArchiveInputStream} or a
+     * {@link CompressedFileArchiveInputStream} for compressor MIME types.
      * @throws ArchiveException if Commons Compress fails to create the archive reader for another reason.
-     * @throws IOException if reading the stream fails.
+     * @throws IOException if reading the stream fails, including corrupt compressed content detected while inspecting
+     * the start of the decompressed content.
      * @throws CompressorException if the compressor stream cannot be created for another reason.
      * @throws NotAnArchiveOrSupportedArchiveException if the MIME type is not a supported archive/compressor type
      * (including RAR), or the content does not match a supported format.
@@ -209,7 +234,7 @@ public class ArchiveUtil {
             }
         }
         if (isCompressorMimeType(mimeType)) {
-            return new TarArchiveInputStream(getCompressorInputStream(inputStream, getBrotliOrLzmaName(mimeType)));
+            return openCompressed(inputStream, mimeType);
         }
         throw new NotAnArchiveOrSupportedArchiveException(NOT_AN_ARCHIVE_MESSAGE + " MIME type: " + mimeType);
     }
@@ -343,6 +368,65 @@ public class ArchiveUtil {
         for (final ArchiveInputStream ais : aisList) {
             IOUtils.closeQuietly(ais);
         }
+    }
+
+    /**
+     * Decompresses the stream and returns a TAR reader if the decompressed content is a TAR archive, otherwise a one-entry
+     * view of the single compressed file.
+     */
+    @SuppressWarnings("rawtypes")
+    private static ArchiveInputStream openCompressed(final InputStream inputStream, final String mimeType) throws IOException, CompressorException {
+        final CompressorInputStream compressorInputStream = getCompressorInputStream(inputStream, getBrotliOrLzmaName(mimeType));
+        // Buffer the decompressed side so that its start can be inspected and then read again.
+        final InputStream decompressed = new BufferedInputStream(compressorInputStream);
+        if (isTar(decompressed)) {
+            return new TarArchiveInputStream(decompressed);
+        }
+        // Only gzip records the original file name.
+        final String name = compressorInputStream instanceof GzipCompressorInputStream ? ((GzipCompressorInputStream) compressorInputStream).getMetaData().getFileName() : null;
+        return new CompressedFileArchiveInputStream(decompressed, name);
+    }
+
+    /**
+     * Tells whether the mark/reset supporting stream starts with a TAR archive, leaving its position unchanged. Accepts
+     * the same headers as {@link ArchiveStreamFactory#detect(InputStream)} (a {@code ustar} magic, or a pre-POSIX header
+     * with a valid checksum) plus the all-zero end-of-archive marker of an empty TAR.
+     */
+    private static boolean isTar(final InputStream decompressed) throws IOException {
+        final byte[] head = new byte[TAR_PEEK_SIZE];
+        decompressed.mark(TAR_PEEK_SIZE);
+        final int length;
+        try {
+            length = IOUtils.read(decompressed, head);
+        } finally {
+            decompressed.reset();
+        }
+        if (TarArchiveInputStream.matches(head, length)) {
+            return true;
+        }
+        if (length < TarConstants.DEFAULT_RCDSIZE) {
+            return false;
+        }
+        return hasValidTarCheckSum(Arrays.copyOf(head, TarConstants.DEFAULT_RCDSIZE)) || length == TAR_PEEK_SIZE && isAllZero(head);
+    }
+
+    /** Tells whether a 512-byte record is a TAR header with a valid checksum; malformed checksum fields yield false. */
+    private static boolean hasValidTarCheckSum(final byte[] header) {
+        try {
+            return TarUtils.verifyCheckSum(header);
+        } catch (IllegalArgumentException e) {
+            // Commons Compress rejects a checksum field that is not octal, i.e. the record is not a TAR header.
+            return false;
+        }
+    }
+
+    private static boolean isAllZero(final byte[] bytes) {
+        for (final byte b : bytes) {
+            if (b != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Opens a 7z archive and translates Commons Compress failures into this library's exceptions. */

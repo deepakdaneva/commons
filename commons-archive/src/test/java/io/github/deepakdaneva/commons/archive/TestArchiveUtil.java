@@ -39,6 +39,8 @@ import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.apache.commons.compress.archivers.tar.TarUtils;
 import org.apache.commons.compress.archivers.zip.UnsupportedZipFeatureException;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.compress.compressors.CompressorException;
@@ -46,6 +48,7 @@ import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.apache.commons.compress.compressors.xz.XZCompressorOutputStream;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -303,6 +306,174 @@ class TestArchiveUtil {
             try (InputStream in = resource("txt_file_zip"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/zip", true)) {
                 assertSingleHelloEntry(ais);
             }
+        }
+    }
+
+    @Nested
+    class CompressedContent {
+
+        /** Asserts that the stream is a one-entry view of a compressed single file with the given name and content. */
+        void assertSingleFile(final ArchiveInputStream<?> ais, final String expectedName, final byte[] expectedContent) throws IOException {
+            assertInstanceOf(CompressedFileArchiveInputStream.class, ais);
+            final ArchiveEntry entry = ais.getNextEntry();
+            assertNotNull(entry);
+            assertEquals(expectedName, entry.getName());
+            assertEquals(ArchiveEntry.SIZE_UNKNOWN, entry.getSize());
+            assertFalse(entry.isDirectory());
+            assertNull(entry.getLastModifiedDate());
+            assertArrayEquals(expectedContent, ArchiveUtil.getEntryInputStream(ais).readAllBytes());
+            assertNull(ais.getNextEntry());
+            assertEquals(-1, ais.read());
+        }
+
+        @Test
+        void gzipSingleFile() throws Exception {
+            // The fixture was created with "gzip", which stores the original file name in the header.
+            try (InputStream in = resource("txt_file_gz"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/gzip")) {
+                assertSingleFile(ais, ENTRY_NAME, HELLO);
+            }
+        }
+
+        @Test
+        void bzip2SingleFile() throws Exception {
+            try (InputStream in = resource("txt_file_bz2"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/x-bzip2")) {
+                assertSingleFile(ais, null, HELLO);
+            }
+        }
+
+        @Test
+        void xzSingleFile() throws Exception {
+            try (InputStream in = resource("txt_file_xz"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/x-xz")) {
+                assertSingleFile(ais, null, HELLO);
+            }
+        }
+
+        @Test
+        void gzipWithoutStoredName() throws Exception {
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(HELLO)), "application/gzip")) {
+                assertSingleFile(ais, null, HELLO);
+            }
+        }
+
+        @Test
+        void singleFileFromStreamWithoutMarkSupport() throws Exception {
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(nonMarkable(bzip2(HELLO)), "application/x-bzip2")) {
+                assertSingleFile(ais, null, HELLO);
+            }
+        }
+
+        @Test
+        void emptyCompressedFileIsOneEmptyEntry() throws Exception {
+            try (InputStream in = resource("empty_file_gz"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/gzip")) {
+                assertSingleFile(ais, "empty_file", new byte[0]);
+            }
+        }
+
+        @Test
+        void largeSingleFileIsStreamedAndRespectsSizeLimit() throws Exception {
+            final byte[] content = new byte[100_000];
+            Arrays.fill(content, (byte) 'a');
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(content)), "application/gzip")) {
+                assertNotNull(ais.getNextEntry());
+                final IOException e = assertThrows(IOException.class, () -> ArchiveUtil.getEntryInputStream(ais, 1024));
+                assertTrue(e.getMessage().contains("maximum allowed size"));
+            }
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(content)), "application/gzip")) {
+                assertSingleFile(ais, null, content);
+            }
+        }
+
+        @Test
+        void readBeforeFirstEntryReturnsEndOfStream() throws Exception {
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(HELLO)), "application/gzip")) {
+                assertEquals(-1, ais.read());
+                assertEquals(0, ais.skip(5));
+                assertNotNull(ais.getNextEntry());
+                assertEquals(1, ais.skip(1));
+                assertArrayEquals(Arrays.copyOfRange(HELLO, 1, HELLO.length), ais.readAllBytes());
+                assertEquals(HELLO.length, ais.getBytesRead());
+            }
+        }
+
+        @Test
+        void tarGzFixtureIsStillReadAsTar() throws Exception {
+            try (InputStream in = resource("txt_file_tar_gz"); ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/x-gzip")) {
+                assertInstanceOf(TarArchiveInputStream.class, ais);
+                assertSingleHelloEntry(ais);
+            }
+        }
+
+        @Test
+        void tarXzIsStillReadAsTar() throws Exception {
+            final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (OutputStream out = new XZCompressorOutputStream(bytes)) {
+                out.write(tar(HELLO));
+            }
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(bytes.toByteArray()), "application/x-xz")) {
+                assertInstanceOf(TarArchiveInputStream.class, ais);
+                assertSingleHelloEntry(ais);
+            }
+        }
+
+        @Test
+        void emptyTarGzIsStillReadAsEmptyTar() throws Exception {
+            final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            new TarArchiveOutputStream(bytes).close();
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(bytes.toByteArray())), "application/gzip")) {
+                assertInstanceOf(TarArchiveInputStream.class, ais);
+                assertNull(ais.getNextEntry());
+            }
+        }
+
+        @Test
+        void preposixTarGzIsStillReadAsTar() throws Exception {
+            // A V7 (pre-POSIX) header has no "ustar" magic and is recognised by its checksum only.
+            final byte[] tar = tar(HELLO);
+            Arrays.fill(tar, TarConstants.MAGIC_OFFSET, TarConstants.MAGIC_OFFSET + TarConstants.MAGICLEN + TarConstants.VERSIONLEN, (byte) 0);
+            Arrays.fill(tar, TarConstants.CHKSUM_OFFSET, TarConstants.CHKSUM_OFFSET + TarConstants.CHKSUMLEN, (byte) ' ');
+            long sum = 0;
+            for (int i = 0; i < TarConstants.DEFAULT_RCDSIZE; i++) {
+                sum += tar[i] & 0xff;
+            }
+            TarUtils.formatCheckSumOctalBytes(sum, tar, TarConstants.CHKSUM_OFFSET, TarConstants.CHKSUMLEN);
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(tar)), "application/gzip")) {
+                assertInstanceOf(TarArchiveInputStream.class, ais);
+                assertSingleHelloEntry(ais);
+            }
+        }
+
+        @Test
+        void shortSingleFileIsNotMistakenForTar() throws Exception {
+            final byte[] content = new byte[TarConstants.DEFAULT_RCDSIZE];
+            try (ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(gzip(content)), "application/gzip")) {
+                assertSingleFile(ais, null, content);
+            }
+        }
+
+        @Test
+        void corruptCompressedContentFails() throws Exception {
+            final byte[] gz = gzip(HELLO);
+            final byte[] truncated = Arrays.copyOf(gz, gz.length / 2);
+            assertThrows(IOException.class, () -> ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(truncated), "application/gzip"));
+            assertNull(ArchiveUtil.getArchiveInputStream(new ByteArrayInputStream(truncated), "application/gzip", true));
+        }
+
+        @Test
+        void closeClosesTheOriginalStream() throws Exception {
+            final boolean[] closed = new boolean[1];
+            final InputStream in = new FilterInputStream(new ByteArrayInputStream(gzip(HELLO))) {
+                @Override
+                public void close() throws IOException {
+                    closed[0] = true;
+                    super.close();
+                }
+            };
+            final ArchiveInputStream<?> ais = ArchiveUtil.getArchiveInputStream(in, "application/gzip");
+            assertInstanceOf(CompressedFileArchiveInputStream.class, ais);
+            assertNotNull(ais.getNextEntry());
+            ais.close();
+            assertTrue(closed[0]);
+            assertEquals(-1, ais.read());
         }
     }
 
