@@ -4,7 +4,7 @@
 
     <groupId>io.github.deepakdaneva</groupId>
     <artifactId>commons</artifactId>
-    <version>1.1.1</version>
+    <version>1.1.2-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
