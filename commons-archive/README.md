@@ -39,7 +39,7 @@ RAR is recognised by `isRarMimeType` but cannot be read (Commons Compress has no
 
 ## Installation
 
-The latest release is **1.1.0**. <!-- x-release-please-version -->
+The latest release is **1.1.1**. <!-- x-release-please-version -->
 
 ### Maven
 
@@ -48,7 +48,7 @@ The latest release is **1.1.0**. <!-- x-release-please-version -->
     <dependency>
         <groupId>io.github.deepakdaneva.commons</groupId>
         <artifactId>commons-archive</artifactId>
-        <version>1.1.0</version> <!-- x-release-please-version -->
+        <version>1.1.1</version> <!-- x-release-please-version -->
     </dependency>
 
     <!-- provided dependencies: choose your own versions -->
@@ -76,7 +76,7 @@ The latest release is **1.1.0**. <!-- x-release-please-version -->
 
 ```groovy
 dependencies {
-    implementation 'io.github.deepakdaneva.commons:commons-archive:1.1.0' // x-release-please-version
+    implementation 'io.github.deepakdaneva.commons:commons-archive:1.1.1' // x-release-please-version
     implementation 'org.apache.commons:commons-compress:1.28.0'
     implementation 'commons-io:commons-io:2.22.0'
     implementation 'org.tukaani:xz:1.12' // only needed for 7z, xz and lzma
