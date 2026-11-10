@@ -39,7 +39,7 @@ published separately to Maven Central, so you only depend on what you use.
 
 ## Installation
 
-The latest release is **1.1.0**. <!-- x-release-please-version -->
+The latest release is **1.1.1**. <!-- x-release-please-version -->
 
 ### Maven
 
@@ -47,14 +47,14 @@ The latest release is **1.1.0**. <!-- x-release-please-version -->
 <dependency>
     <groupId>io.github.deepakdaneva.commons</groupId>
     <artifactId>commons-archive</artifactId>
-    <version>1.1.0</version> <!-- x-release-please-version -->
+    <version>1.1.1</version> <!-- x-release-please-version -->
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.deepakdaneva.commons:commons-archive:1.1.0' // x-release-please-version
+implementation 'io.github.deepakdaneva.commons:commons-archive:1.1.1' // x-release-please-version
 ```
 
 Remember to add the module's `provided` dependencies as well (for `commons-archive`: Apache Commons Compress and
