@@ -1,9 +1,13 @@
 # commons
 
 [![CI](https://github.com/deepakdaneva/commons/actions/workflows/ci.yml/badge.svg)](https://github.com/deepakdaneva/commons/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/deepakdaneva/commons/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/deepakdaneva/commons/actions/workflows/github-code-scanning/codeql)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.deepakdaneva.commons/commons-archive?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.deepakdaneva.commons/commons-archive)
 [![javadoc](https://javadoc.io/badge2/io.github.deepakdaneva.commons/commons-archive/javadoc.svg)](https://javadoc.io/doc/io.github.deepakdaneva.commons/commons-archive)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/deepakdaneva/commons)](https://github.com/deepakdaneva/commons/releases/latest)
+[![Java](https://img.shields.io/badge/Java-11%2B-orange)](#requirements)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-fe5196)](https://conventionalcommits.org)
+[![License](https://img.shields.io/github/license/deepakdaneva/commons)](LICENSE)
 
 A collection of small, focused Java utilities that take the boilerplate out of everyday tasks. Each module is
 published separately to Maven Central, so you only depend on what you use.

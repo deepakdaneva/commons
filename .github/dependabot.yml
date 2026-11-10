@@ -10,6 +10,16 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    ignore:
+      # Maven 3.10 breaks authenticated uploads to the Central snapshot repository; stay on 3.9.x
+      - dependency-name: "org.apache.maven:apache-maven"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # JUnit 6 requires Java 17; this library supports Java 11
+      - dependency-name: "org.junit:junit-bom"
+        update-types: ["version-update:semver-major"]
+      # Spotless 3 requires Java 17 to run; CI builds on Java 11
+      - dependency-name: "com.diffplug.spotless:spotless-maven-plugin"
+        update-types: ["version-update:semver-major"]
     groups:
       maven-plugins:
         patterns: ["org.apache.maven.plugins:*", "*-maven-plugin"]
